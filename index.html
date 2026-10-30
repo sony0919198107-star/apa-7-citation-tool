@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APA 7th 智慧參考文獻工作台（台灣護理學會規範版）</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons for UI -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 標準 APA Hanging Indent 凸排樣式 */
+    .apa-hanging {
+      padding-left: 2em;
+      text-indent: -2em;
+      line-height: 1.8;
+      word-break: break-word;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- 頂部導航 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center text-xl shadow-md shadow-brand-500/20">
+          <i class="ph-bold ph-books"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">APA 7th 智慧參考文獻工作台</h1>
+          <p class="text-xs text-slate-500">依據台灣護理學會 (TWNA) 2022 年指引 ｜ 支援 Crossref 檢索與自動筆劃排序</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          即時自動排版中
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- 左半邊：智慧檢索與文獻細節表單 (7 cols) -->
+    <div class="lg:col-span-7 space-y-5">
+
+      <!-- 1. 智慧標題檢索區 -->
+      <section class="bg-gradient-to-br from-brand-50 to-white border border-brand-200 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-bold text-brand-800 flex items-center gap-1.5">
+            <i class="ph-bold ph-sparkle text-brand-500"></i> 智慧文獻標題檢索（Crossref API）
+          </label>
+          <span class="text-xs text-slate-400">支援英文與具 DOI 之中文護理期刊</span>
+        </div>
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+            <input type="text" id="queryTitle" 
+              placeholder="輸入論文篇名（例：Living with diabetes 或 全球健康議題與護理研究）" 
+              class="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 text-sm bg-white outline-none transition"
+              onkeydown="if(event.key==='Enter') searchCrossRef()"
+            >
+          </div>
+          <button onclick="searchCrossRef()" id="searchBtn"
+            class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white text-sm font-semibold transition flex items-center gap-1.5 shadow-sm shadow-brand-500/20 whitespace-nowrap">
+            <i class="ph-bold ph-paper-plane-tilt"></i> 檢索並帶入
+          </button>
+        </div>
+
+        <!-- 狀態反饋提示 -->
+        <div id="statusText" class="mt-2 text-xs text-slate-500 flex items-center gap-1.5 min-h-[1.25rem]">
+          <span>輸入文獻題目後點選「檢索並帶入」，系統將自動抓取詮釋資料填入下方欄位。</span>
+        </div>
+
+        <!-- 多篇候選清單切換 -->
+        <div id="candidatesList" class="hidden mt-3 pt-3 border-t border-brand-100">
+          <p class="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1">
+            <i class="ph-bold ph-list-numbers text-amber-600"></i> 找到多篇相關文獻，請點擊欲採用的文獻：
+          </p>
+          <div id="candidatesContainer" class="space-y-1.5 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
+        </div>
+      </section>
+
+      <!-- 2. 文獻類型標籤與自訂表單 -->
+      <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        
+        <!-- 標籤切換 -->
+        <div class="flex items-center justify-between border-b border-slate-150 pb-3">
+          <div class="flex items-center gap-1.5">
+            <i class="ph-bold ph-sliders text-slate-600"></i>
+            <h2 class="text-sm font-bold text-slate-800">文獻類別與詳細欄位</h2>
+          </div>
+          
+          <!-- 語言切換 -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-semibold text-slate-500">格式語系：</label>
+            <select id="docLang" onchange="generateCitation()" 
+              class="text-xs font-medium border border-slate-300 rounded-lg px-2.5 py-1 bg-slate-50 focus:border-brand-500 outline-none">
+              <option value="zh">中文格式（頓號、斜體、中文括弧）</option>
+              <option value="en">英文格式（English APA 7）</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 頁籤按鈕群 -->
+        <div class="flex flex-wrap gap-1.5" id="tabButtons">
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-brand-500 text-white active" data-type="journal">期刊文章</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" data-type="book">單整本書籍</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" data-type="chapter">書籍之一章</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" data-type="translated">翻譯書籍</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" data-type="report">政府/機構報告</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" data-type="uptodate">UpToDate 實證</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100" data-type="thesis">學位論文</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100" data-type="conference">研討會發表</button>
+          <button type="button" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100" data-type="law">法律法規</button>
+        </div>
+
+        <!-- 8. 表單本體 -->
+        <div id="formsContainer" class="pt-2">
+
+          <!-- 1. 期刊文章 -->
+          <div id="form-journal" class="form-pane space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">作者群 <span class="text-slate-400 font-normal">（中文以頓號「、」或半形逗號分隔；若 $\ge 21$ 位系統自動折疊前19位與末位）</span></label>
+              <input type="text" id="j_author" placeholder="例：胡文郁、張雯雯、張榮珍 或 Gürkan, K. P., & Bahar, Z." 
+                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版年 (西元)</label>
+                <input type="text" id="j_year" placeholder="例：2020" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">文章篇名 (Title)</label>
+                <input type="text" id="j_title" placeholder="篇名完整標題" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-6 gap-3">
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">期刊名稱 (Journal)</label>
+                <input type="text" id="j_journal" placeholder="例：護理雜誌 或 The Journal of Nursing Research" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">卷 (Vol)</label>
+                <input type="text" id="j_vol" placeholder="例：67" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">期 (Issue)</label>
+                <input type="text" id="j_issue" placeholder="例：2" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">起訖頁 / ID</label>
+                <input type="text" id="j_page" placeholder="例：13-21 或 Article e73" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">DOI 或 網址</label>
+              <input type="text" id="j_doi" placeholder="例：https://doi.org/10.6224/JN.202004_67(2).03" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+          </div>
+
+          <!-- 2. 單整本書籍 -->
+          <div id="form-book" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">作者 / 編著者</label>
+              <input type="text" id="b_author" placeholder="例：簡莉盈、劉影梅 或 Grady, P. A., & Hinshaw, A. S." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">版權年份</label>
+                <input type="text" id="b_year" placeholder="例：2017" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">書名 (Book Title)</label>
+                <input type="text" id="b_title" placeholder="例：實證護理學導論" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">版次 <span class="text-slate-400 font-normal">(初版免填)</span></label>
+                <input type="text" id="b_edition" placeholder="例：三版 或 2nd ed." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版商 <span class="text-slate-400 font-normal">(免列出版地)</span></label>
+                <input type="text" id="b_publisher" placeholder="例：華杏 或 Springer" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">DOI 或 URL (選填)</label>
+              <input type="text" id="b_doi" placeholder="https://doi.org/..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+          </div>
+
+          <!-- 3. 書籍之一章 -->
+          <div id="form-chapter" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">該篇章作者</label>
+              <input type="text" id="c_author" placeholder="例：林元淑、黃靜微" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版年份</label>
+                <input type="text" id="c_year" placeholder="例：2017" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">篇章名稱</label>
+                <input type="text" id="c_title" placeholder="例：新生兒及其護理" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">全書編者 / 總校閱</label>
+                <input type="text" id="c_editor" placeholder="中文例：陳月枝總校閱；英文例：G. Y. Iwamasa & P. A. Hays (Eds.)" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">全本書名</label>
+                <input type="text" id="c_booktitle" placeholder="例：實用兒科護理" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">版次與起訖頁數</label>
+                <input type="text" id="c_pages" placeholder="中文例：八版，38-112頁；英文例：2nd ed., pp. 287-314" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版商</label>
+                <input type="text" id="c_publisher" placeholder="例：華杏 或 American Psychological Association" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">DOI 或 URL (選填)</label>
+              <input type="text" id="c_doi" placeholder="https://doi.org/..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+          </div>
+
+          <!-- 4. 翻譯書籍 -->
+          <div id="form-translated" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">原著作者</label>
+              <input type="text" id="t_author" placeholder="例：Bickley, L. S., & Szilagyi, P. G." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">中文翻譯出版年</label>
+                <input type="text" id="t_trans_year" placeholder="例：2017" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">翻譯書名</label>
+                <input type="text" id="t_title" placeholder="例：最新貝氏身體檢查指引" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">譯者</label>
+                <input type="text" id="t_translator" placeholder="例：劉禹葶譯" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">版次</label>
+                <input type="text" id="t_edition" placeholder="例：11版" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版商</label>
+                <input type="text" id="t_publisher" placeholder="例：合記" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">原著出版年</label>
+                <input type="text" id="t_orig_year" placeholder="例：2013" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. 政府/機構報告 -->
+          <div id="form-report" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">政府 / 機構 / 組織名稱</label>
+              <input type="text" id="r_author" placeholder="例：衛生福利部疾病管制署 或 National Cancer Institute" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">發布日期 / 年份</label>
+                <input type="text" id="r_date" placeholder="中文例：2020，4月14日；英文例：2018" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">報告名稱 / 通函標題</label>
+                <input type="text" id="r_title" placeholder="完整報告或公函標題" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">文件或報告編號 (選填)</label>
+                <input type="text" id="r_no" placeholder="例：疾病管制署致醫界通函第427號 或 NIH Publication No. 18-2424" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版單位 (若同作者可留空)</label>
+                <input type="text" id="r_publisher" placeholder="例：U. S. Department of Health and Human Services..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">網址 URL</label>
+              <input type="text" id="r_url" placeholder="https://..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+          </div>
+
+          <!-- 6. UpToDate 實證 -->
+          <div id="form-uptodate" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">文章作者</label>
+              <input type="text" id="u_author" placeholder="例：Morey, M. C." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">年份 (Year)</label>
+                <input type="text" id="u_year" placeholder="例：2019" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">篇名 (Title of article)</label>
+                <input type="text" id="u_title" placeholder="例：Physical activity and exercise in older adults" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">檢索日期 (Retrieved date)</label>
+                <input type="text" id="u_retrieved" placeholder="例：May 12, 2020" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">UpToDate 專屬文章網址</label>
+                <input type="text" id="u_url" placeholder="https://www.uptodate.com/contents/..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. 學位論文 -->
+          <div id="form-thesis" class="form-pane hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">作者</label>
+                <input type="text" id="th_author" placeholder="例：陳美麗" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">畢業年份 (西元)</label>
+                <input type="text" id="th_year" placeholder="例：2021" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">學位論文完整名稱</label>
+              <input type="text" id="th_title" placeholder="論文標題" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">學位類別</label>
+                <select id="th_degree" onchange="generateCitation()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white">
+                  <option value="碩士">碩士論文 (Master's thesis)</option>
+                  <option value="博士">博士論文 (Doctoral dissertation)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">出版狀態</label>
+                <select id="th_status" onchange="generateCitation()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white">
+                  <option value="unpublished">未出版之論文（實體典藏）</option>
+                  <option value="database">已收錄於資料庫</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">學校校名與系所</label>
+                <input type="text" id="th_school" placeholder="例：長庚大學護理學系" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">資料庫名稱 (已收錄時填寫)</label>
+                <input type="text" id="th_db" placeholder="例：臺灣博碩士論文知識加值系統" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">論文檢索網址 URL</label>
+                <input type="text" id="th_url" placeholder="https://..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. 研討會發表 -->
+          <div id="form-conference" class="form-pane hidden space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">發表者清單</label>
+              <input type="text" id="conf_author" placeholder="例：王小明、李大華" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700 mb-1">發表年月日</label>
+                <input type="text" id="conf_date" placeholder="例：2023，10月20日" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">發表題目</label>
+                <input type="text" id="conf_title" placeholder="論文發表名稱" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">發表形式</label>
+                <select id="conf_type" onchange="generateCitation()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white">
+                  <option value="poster">海報發表 (Poster presentation)</option>
+                  <option value="oral">口頭發表 (Oral presentation)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">大會 / 研討會名稱</label>
+                <input type="text" id="conf_event" placeholder="例：台灣護理學會論文發表會" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">舉辦地點 / 城市</label>
+                <input type="text" id="conf_place" placeholder="例：台北市" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">URL 或 DOI (選填)</label>
+              <input type="text" id="conf_url" placeholder="https://..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+            </div>
+          </div>
+
+          <!-- 9. 法律法規 -->
+          <div id="form-law" class="form-pane hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">法規名稱</label>
+                <input type="text" id="law_title" placeholder="例：護理人員法" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">公布 / 修正年月日</label>
+                <input type="text" id="law_date" placeholder="例：2020，1月15日" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">法規動態類型</label>
+                <select id="law_action" onchange="generateCitation()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white">
+                  <option value="amended">修正公布</option>
+                  <option value="promulgated">公布</option>
+                  <option value="none">無標註動態</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">全國法規資料庫網址 / 官方公告連結</label>
+                <input type="text" id="law_url" placeholder="https://law.moj.gov.tw/..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-brand-500 outline-none" oninput="generateCitation()">
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+
+    <!-- 右半邊：即時生成結果、內文引用建議與批次排序清單 (5 cols) -->
+    <div class="lg:col-span-5 space-y-5">
+
+      <!-- 1. 單筆即時預覽卡片 -->
+      <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+            <h2 class="text-sm font-bold text-slate-900">單筆文獻預覽</h2>
+          </div>
+          <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">標準 APA 凸排</span>
+        </div>
+
+        <!-- 凸排呈現框 -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 min-h-[5.5rem] flex items-center">
+          <div id="singleRefOutput" class="apa-hanging text-sm text-slate-800 w-full select-text">
+            <span class="text-slate-400 italic font-normal">請於左側輸入資料或進行標題檢索...</span>
+          </div>
+        </div>
+
+        <!-- 操作按鈕列 -->
+        <div class="flex flex-wrap gap-2">
+          <button onclick="copyRichText('singleRefOutput')" 
+            class="flex-1 min-w-[130px] px-3 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm shadow-brand-500/20 active:scale-[0.98] transition">
+            <i class="ph-bold ph-copy"></i> 複製富文本 (Word保證斜體)
+          </button>
+          <button onclick="copyPlainText('singleRefOutput')" 
+            class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1 active:scale-[0.98] transition">
+            <i class="ph ph-file-text"></i> 純文字
+          </button>
+          <button onclick="addCurrentToList()" 
+            class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 active:scale-[0.98] transition">
+            <i class="ph-bold ph-plus-circle"></i> ➕ 加入多筆清單
+          </button>
+        </div>
+
+        <!-- 內文引用 (In-text Citation) 建議 -->
+        <div class="pt-3 border-t border-slate-150 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <i class="ph-bold ph-quotes text-brand-500"></i> 正文引用格式建議 (In-text Citation)
+            </span>
+            <button onclick="copyPlainText('inTextOutput')" class="text-[11px] text-brand-600 hover:underline flex items-center gap-0.5">
+              <i class="ph ph-copy"></i> 複製引用
+            </button>
+          </div>
+          <div id="inTextOutput" class="bg-brand-50/60 border border-brand-100 rounded-lg p-2.5 text-xs text-brand-900 leading-relaxed font-mono select-text">
+            --
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 多筆暫存文獻庫 (自動排序) -->
+      <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <i class="ph-bold ph-tray text-emerald-600"></i> 已排版文獻清單庫
+              <span id="listCountBadge" class="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">0 篇</span>
+            </h2>
+            <p class="text-[11px] text-slate-400 mt-0.5">雙軌自動排序：中文在先（按姓氏筆劃少至多），英文在後（按A-Z）</p>
+          </div>
+          <button onclick="clearBatchList()" class="text-xs text-rose-500 hover:text-rose-700 hover:underline flex items-center gap-1">
+            <i class="ph ph-trash"></i> 清空
+          </button>
+        </div>
+
+        <!-- 清單展示框 -->
+        <div id="batchContainer" class="bg-slate-50 border border-slate-200 rounded-xl p-4 min-h-[12rem] max-h-[22rem] overflow-y-auto custom-scroll">
+          <div id="emptyListTip" class="text-center py-8 text-slate-400 text-xs">
+            <i class="ph ph-clipboard-text text-3xl mb-1 block"></i>
+            目前暫無暫存文獻，請點選上方「加入多筆清單」按鈕
+          </div>
+          <ol id="batchOlList" class="space-y-3.5"></ol>
+        </div>
+
+        <!-- 批次複製工具列 -->
+        <div class="flex items-center gap-2 pt-1">
+          <button onclick="copyBatchRichText()" 
+            class="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition">
+            <i class="ph-bold ph-copy-simple"></i> 📋 一鍵複製整份清單 (Word適用，含凸排斜體)
+          </button>
+          <button onclick="copyBatchPlainText()" 
+            class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1 active:scale-[0.98] transition">
+            <i class="ph ph-text-aa"></i> 純文字
+          </button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 浮動提示訊息 Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 transform translate-y-16 opacity-0 pointer-events-none transition-all duration-300 z-50 flex items-center gap-2 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl">
+    <i class="ph-fill ph-check-circle text-emerald-400 text-base"></i>
+    <span id="toastMsg">已成功複製至剪貼簿！</span>
+  </div>
+
+  <script>
+    // 全域變數
+    let currentType = 'journal';
+    let savedReferences = []; // 存儲批次文獻物件陣列 { id, lang, rawText, html, inText }
+
+    // 初始化事件監聽
+    document.addEventListener('DOMContentLoaded', () => {
+      // 頁籤切換監聽
+      document.querySelectorAll('#tabButtons .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.getAttribute('data-type');
+          switchTab(type);
+        });
+      });
+
+      // 預設產出一筆提示
+      generateCitation();
+    });
+
+    // 頁籤切換邏輯
+    function switchTab(type) {
+      currentType = type;
+      
+      // 更新按鈕外觀
+      document.querySelectorAll('#tabButtons .tab-btn').forEach(b => {
+        b.classList.remove('bg-brand-500', 'text-white', 'active');
+        b.classList.add('bg-slate-50', 'text-slate-700');
+        if (b.getAttribute('data-type') === type) {
+          b.classList.remove('bg-slate-50', 'text-slate-700');
+          b.classList.add('bg-brand-500', 'text-white', 'active');
+        }
+      });
+
+      // 切換表單區域
+      document.querySelectorAll('.form-pane').forEach(p => p.classList.add('hidden'));
+      const activeForm = document.getElementById(`form-${type}`);
+      if (activeForm) activeForm.classList.remove('hidden');
+
+      generateCitation();
+    }
+
+    // 格式化作者（支援 1-20 位全列，第 21 位以上自動折疊前19位與末位）
+    function formatAuthors(rawStr, isZh) {
+      if (!rawStr) return '';
+      // 拆分多個作者 (支援 頓號、分號、逗點、換行)
+      let authors = rawStr.split(/[、;，\n]+/).map(s => s.trim()).filter(Boolean);
+      if (authors.length === 0) return '';
+
+      if (isZh) {
+        if (authors.length === 1) return authors[0];
+        if (authors.length <= 20) return authors.join('、');
+        // 21位以上：前19位全列，加省略號 … 再加最後一位
+        return authors.slice(0, 19).join('、') + '…' + authors[authors.length - 1];
+      } else {
+        if (authors.length === 1) return authors[0];
+        if (authors.length <= 20) {
+          return authors.slice(0, -1).join(', ') + ', & ' + authors[authors.length - 1];
+        }
+        // 英文 21位以上：前19位全列，逗點接著 ... 再加最後一位
+        return authors.slice(0, 19).join(', ') + ', ... ' + authors[authors.length - 1];
+      }
+    }
+
+    // DOI / URL 自動包裝成可點擊超連結
+    function wrapLink(url) {
+      if (!url) return '';
+      const cleanUrl = url.trim();
+      if (!cleanUrl) return '';
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-brand-600 hover:text-brand-800 underline decoration-brand-300 break-all transition">${cleanUrl}</a>`;
+    }
+
+    // 核心生成計算
+    function generateCitation() {
+      const isZh = document.getElementById('docLang').value === 'zh';
+      let refHtml = '';
+      let inText = '--';
+
+      if (currentType === 'journal') {
+        const author = formatAuthors(document.getElementById('j_author').value, isZh);
+        const year = document.getElementById('j_year').value.trim();
+        const title = document.getElementById('j_title').value.trim();
+        const journal = document.getElementById('j_journal').value.trim();
+        const vol = document.getElementById('j_vol').value.trim();
+        const issue = document.getElementById('j_issue').value.trim();
+        const page = document.getElementById('j_page').value.trim();
+        const doi = document.getElementById('j_doi').value.trim();
+
+        if (author || title || journal) {
+          let viHtml = '';
+          if (vol && issue) viHtml = `<i>${vol}</i>(${issue})`;
+          else if (vol && !issue) viHtml = `<i>${vol}</i>`;
+          else if (!vol && issue) viHtml = `${issue}`; // 護理學會規定：無卷數時僅列期數且不需斜體、不需括弧
+
+          const linkStr = wrapLink(doi);
+          if (isZh) {
+            refHtml = `${author}（${year}）• ${title} • <i>${journal}</i>${viHtml ? '，' + viHtml : ''}${page ? '，' + page : ''}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            refHtml = `${author} (${year}). ${title}. <i>${journal}</i>${viHtml ? ', ' + viHtml : ''}${page ? ', ' + page : ''}.${linkStr ? ' ' + linkStr : ''}`;
+          }
+          inText = computeInText(author, year, isZh);
+        }
+
+      } else if (currentType === 'book') {
+        const author = formatAuthors(document.getElementById('b_author').value, isZh);
+        const year = document.getElementById('b_year').value.trim();
+        const title = document.getElementById('b_title').value.trim();
+        const edition = document.getElementById('b_edition').value.trim();
+        const publisher = document.getElementById('b_publisher').value.trim();
+        const doi = document.getElementById('b_doi').value.trim();
+
+        if (author || title) {
+          const edStr = edition ? (isZh ? `（${edition}）` : ` (${edition})`) : '';
+          const linkStr = wrapLink(doi);
+          if (isZh) {
+            refHtml = `${author}（${year}）• <i>${title}</i>${edStr} • ${publisher}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            refHtml = `${author} (${year}). <i>${title}</i>${edStr}. ${publisher}.${linkStr ? ' ' + linkStr : ''}`;
+          }
+          inText = computeInText(author, year, isZh);
+        }
+
+      } else if (currentType === 'chapter') {
+        const author = formatAuthors(document.getElementById('c_author').value, isZh);
+        const year = document.getElementById('c_year').value.trim();
+        const title = document.getElementById('c_title').value.trim();
+        const editor = document.getElementById('c_editor').value.trim();
+        const booktitle = document.getElementById('c_booktitle').value.trim();
+        const pages = document.getElementById('c_pages').value.trim();
+        const publisher = document.getElementById('c_publisher').value.trim();
+        const doi = document.getElementById('c_doi').value.trim();
+
+        if (author || title) {
+          const linkStr = wrapLink(doi);
+          if (isZh) {
+            refHtml = `${author}（${year}）• ${title} • 於${editor}，<i>${booktitle}</i>（${pages}）• ${publisher}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            refHtml = `${author} (${year}). ${title}. In ${editor}, <i>${booktitle}</i> (${pages}). ${publisher}.${linkStr ? ' ' + linkStr : ''}`;
+          }
+          inText = computeInText(author, year, isZh);
+        }
+
+      } else if (currentType === 'translated') {
+        const author = document.getElementById('t_author').value.trim();
+        const transYear = document.getElementById('t_trans_year').value.trim();
+        const title = document.getElementById('t_title').value.trim();
+        const translator = document.getElementById('t_translator').value.trim();
+        const edition = document.getElementById('t_edition').value.trim();
+        const publisher = document.getElementById('t_publisher').value.trim();
+        const origYear = document.getElementById('t_orig_year').value.trim();
+
+        if (author || title) {
+          const meta = [translator, edition].filter(Boolean).join('；');
+          refHtml = `${author}（${transYear}）• <i>${title}</i>（${meta}）• ${publisher}。（原著出版於${origYear}）`;
+          const lead = author.split(/[,、&]/)[0].trim();
+          inText = `括弧引用: (${lead}, ${origYear}/${transYear}) ｜ 敘述引用: ${lead} (${origYear}/${transYear})`;
+        }
+
+      } else if (currentType === 'report') {
+        const author = document.getElementById('r_author').value.trim();
+        const date = document.getElementById('r_date').value.trim();
+        const title = document.getElementById('r_title').value.trim();
+        const no = document.getElementById('r_no').value.trim();
+        const publisher = document.getElementById('r_publisher').value.trim();
+        const url = document.getElementById('r_url').value.trim();
+
+        if (author || title) {
+          const noStr = no ? (isZh ? `（${no}）` : ` (${no})`) : '';
+          const linkStr = wrapLink(url);
+          if (isZh) {
+            refHtml = `${author}（${date}）• <i>${title}</i>${noStr}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            refHtml = `${author}. (${date}). <i>${title}</i>${noStr ? ' ' + noStr : ''}. ${publisher ? publisher + '. ' : ''}${linkStr ? ' ' + linkStr : ''}`;
+          }
+          const yr = date.split(/[,，\s年]/)[0];
+          inText = computeInText(author, yr, isZh);
+        }
+
+      } else if (currentType === 'uptodate') {
+        const author = document.getElementById('u_author').value.trim();
+        const year = document.getElementById('u_year').value.trim();
+        const title = document.getElementById('u_title').value.trim();
+        const retDate = document.getElementById('u_retrieved').value.trim();
+        const url = document.getElementById('u_url').value.trim();
+
+        if (author || title) {
+          const linkStr = wrapLink(url);
+          refHtml = `${author} (${year}). ${title}. <i>UpToDate</i>. Retrieved ${retDate}, from ${linkStr}`;
+          inText = computeInText(author, year, false);
+        }
+
+      } else if (currentType === 'thesis') {
+        const author = formatAuthors(document.getElementById('th_author').value, isZh);
+        const year = document.getElementById('th_year').value.trim();
+        const title = document.getElementById('th_title').value.trim();
+        const degree = document.getElementById('th_degree').value;
+        const status = document.getElementById('th_status').value;
+        const school = document.getElementById('th_school').value.trim();
+        const db = document.getElementById('th_db').value.trim();
+        const url = document.getElementById('th_url').value.trim();
+
+        if (author || title) {
+          const linkStr = wrapLink(url);
+          if (isZh) {
+            const bracketInfo = (status === 'unpublished') ? `〔未出版之${degree}論文〕` : `〔${degree}論文，${school}〕`;
+            const location = (status === 'unpublished') ? school : (db ? db : school);
+            refHtml = `${author}（${year}）• <i>${title}</i>${bracketInfo} • ${location}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            const degEn = (degree === '碩士') ? "Master's thesis" : "Doctoral dissertation";
+            const bracketInfo = (status === 'unpublished') ? `[Unpublished ${degEn}]` : `[${degEn}, ${school}]`;
+            const location = (status === 'unpublished') ? school : (db ? db : school);
+            refHtml = `${author} (${year}). <i>${title}</i> ${bracketInfo}. ${location}.${linkStr ? ' ' + linkStr : ''}`;
+          }
+          inText = computeInText(author, year, isZh);
+        }
+
+      } else if (currentType === 'conference') {
+        const author = formatAuthors(document.getElementById('conf_author').value, isZh);
+        const date = document.getElementById('conf_date').value.trim();
+        const title = document.getElementById('conf_title').value.trim();
+        const type = document.getElementById('conf_type').value;
+        const event = document.getElementById('conf_event').value.trim();
+        const place = document.getElementById('conf_place').value.trim();
+        const url = document.getElementById('conf_url').value.trim();
+
+        if (author || title) {
+          const typeZh = (type === 'poster') ? '〔海報發表〕' : '〔口頭發表〕';
+          const typeEn = (type === 'poster') ? '[Poster presentation]' : '[Oral presentation]';
+          const linkStr = wrapLink(url);
+
+          if (isZh) {
+            refHtml = `${author}（${date}）• ${title}${typeZh} • ${event}，${place}。${linkStr ? ' ' + linkStr : ''}`;
+          } else {
+            refHtml = `${author} (${date}). <i>${title}</i> ${typeEn}. ${event}, ${place}.${linkStr ? ' ' + linkStr : ''}`;
+          }
+          const yr = date.split(/[,，\s年]/)[0];
+          inText = computeInText(author, yr, isZh);
+        }
+
+      } else if (currentType === 'law') {
+        const title = document.getElementById('law_title').value.trim();
+        const date = document.getElementById('law_date').value.trim();
+        const action = document.getElementById('law_action').value;
+        const url = document.getElementById('law_url').value.trim();
+
+        if (title) {
+          let actStr = '';
+          if (action === 'amended') actStr = '修正公布';
+          else if (action === 'promulgated') actStr = '公布';
+          const linkStr = wrapLink(url);
+
+          if (isZh) {
+            refHtml = `${title}（${date}${actStr ? actStr : ''}）• ${linkStr}`;
+          } else {
+            refHtml = `${title}. (${date}). ${linkStr}`;
+          }
+          const yr = date.split(/[,，\s年]/)[0];
+          inText = `括弧引用: (${title}, ${yr}) ｜ 敘述引用: ${title}（${yr}）`;
+        }
+      }
+
+      // 渲染至輸出預覽框
+      const outBox = document.getElementById('singleRefOutput');
+      if (refHtml) {
+        outBox.innerHTML = refHtml;
+        document.getElementById('inTextOutput').innerText = inText;
+      } else {
+        outBox.innerHTML = '<span class="text-slate-400 italic font-normal">請於左側輸入資料或進行標題檢索...</span>';
+        document.getElementById('inTextOutput').innerText = '--';
+      }
+    }
+
+    // 計算文中引用格式 (In-text Citation)
+    function computeInText(authorStr, year, isZh) {
+      if (!authorStr) return '--';
+      const cleanYr = year || 'n.d.';
+      if (isZh) {
+        const names = authorStr.split(/[、,，\s]+/).filter(Boolean);
+        if (names.length === 0) return '--';
+        if (names.length === 1) return `括弧引用: (${names[0]}, ${cleanYr}) ｜ 敘述引用: ${names[0]}（${cleanYr}）`;
+        if (names.length === 2) return `括弧引用: (${names[0]}、${names[1]}, ${cleanYr}) ｜ 敘述引用: ${names[0]}、${names[1]}（${cleanYr}）`;
+        return `括弧引用: (${names[0]}等, ${cleanYr}) ｜ 敘述引用: ${names[0]}等（${cleanYr}）`;
+      } else {
+        const parts = authorStr.split(/&|,/).map(s => s.trim()).filter(Boolean);
+        if (parts.length === 0) return '--';
+        const f1 = parts[0].split(' ')[0].replace(/,/g, '');
+        if (parts.length === 1) return `(${f1}, ${cleanYr}) ｜ ${f1} (${cleanYr})`;
+        if (parts.length === 2) {
+          const f2 = parts[1].split(' ')[0].replace(/,/g, '');
+          return `(${f1} & ${f2}, ${cleanYr}) ｜ ${f1} and ${f2} (${cleanYr})`;
+        }
+        return `(${f1} et al., ${cleanYr}) ｜ ${f1} et al. (${cleanYr})`;
+      }
+    }
+
+    // Crossref 自動檢索邏輯
+    async function searchCrossRef() {
+      const titleInput = document.getElementById('queryTitle').value.trim();
+      const status = document.getElementById('statusText');
+      const candidatesList = document.getElementById('candidatesList');
+      const candidatesContainer = document.getElementById('candidatesContainer');
+
+      if (!titleInput) {
+        showToast('請先輸入文獻標題！');
+        return;
+      }
+
+      status.innerHTML = `<span class="text-brand-600 flex items-center gap-1.5"><i class="ph-bold ph-spinner animate-spin"></i> 正在國際 Crossref 資料庫中檢索文獻...</span>`;
+      candidatesList.classList.add('hidden');
+      candidatesContainer.innerHTML = '';
+
+      try {
+        const res = await fetch(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(titleInput)}&rows=3`);
+        if (!res.ok) throw new Error('API 響應異常');
+        const data = await res.json();
+        const items = data.message?.items;
+
+        if (!items || items.length === 0) {
+          status.innerHTML = `<span class="text-rose-500 flex items-center gap-1"><i class="ph-bold ph-warning-circle"></i> 查無相符文獻，請檢查標題是否拼寫完整，或於下方手動輸入。</span>`;
+          return;
+        }
+
+        status.innerHTML = `<span class="text-emerald-700 flex items-center gap-1"><i class="ph-bold ph-check-circle"></i> 找到 ${items.length} 筆資料，已自動帶入最相符文獻至期刊表單。</span>`;
+        fillMetadata(items[0]);
+
+        if (items.length > 1) {
+          candidatesList.classList.remove('hidden');
+          items.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = 'p-2 rounded-lg border border-slate-200 hover:border-brand-400 bg-white hover:bg-brand-50/50 cursor-pointer text-xs transition flex items-start gap-2';
+            const t = item.title ? item.title[0] : '無篇名';
+            const yr = extractYear(item);
+            const j = item['container-title'] ? item['container-title'][0] : '';
+            row.innerHTML = `<span class="font-bold text-brand-600 bg-brand-100 rounded px-1.5 py-0.5">#${idx + 1}</span><div class="flex-1"><p class="font-semibold text-slate-800 line-clamp-1">${t}</p><p class="text-slate-500">${yr ? `(${yr})` : ''} <i>${j}</i></p></div>`;
+            row.onclick = () => {
+              fillMetadata(item);
+              status.innerHTML = `<span class="text-emerald-700 flex items-center gap-1"><i class="ph-bold ph-check-circle"></i> 已切換帶入第 #${idx + 1} 筆文獻！</span>`;
+            };
+            candidatesContainer.appendChild(row);
+          });
+        }
+
+      } catch (err) {
+        status.innerHTML = `<span class="text-rose-500 flex items-center gap-1"><i class="ph-bold ph-warning"></i> 網路檢索超時或受限，請直接在下方表單進行編輯。</span>`;
+        console.error(err);
+      }
+    }
+
+    function extractYear(item) {
+      if (item['published-print']?.['date-parts']?.[0]?.[0]) return item['published-print']['date-parts'][0][0];
+      if (item['published-online']?.['date-parts']?.[0]?.[0]) return item['published-online']['date-parts'][0][0];
+      if (item.issued?.['date-parts']?.[0]?.[0]) return item.issued['date-parts'][0][0];
+      return '';
+    }
+
+    function fillMetadata(item) {
+      switchTab('journal');
+
+      const title = item.title ? item.title[0] : '';
+      const journal = item['container-title'] ? item['container-title'][0] : '';
+      const year = extractYear(item);
+      const volume = item.volume || '';
+      const issue = item.issue || '';
+      const page = item.page || (item.article_number ? `Article ${item.article_number}` : '');
+      const doi = item.DOI ? `https://doi.org/${item.DOI}` : '';
+
+      const isZh = /[\u4e00-\u9fa5]/.test(title);
+      document.getElementById('docLang').value = isZh ? 'zh' : 'en';
+
+      let authorsArr = [];
+      if (item.author && item.author.length > 0) {
+        authorsArr = item.author.map(a => {
+          if (a.family && a.given) {
+            if (isZh) return `${a.family}${a.given}`;
+            const initials = a.given.split(/[\s-]+/).map(g => g.charAt(0) + '.').join(' ');
+            return `${a.family}, ${initials}`;
+          }
+          return a.family || a.name || '';
+        });
+      }
+
+      document.getElementById('j_author').value = isZh ? authorsArr.join('、') : authorsArr.join(', ');
+      document.getElementById('j_year').value = year;
+      document.getElementById('j_title').value = title;
+      document.getElementById('j_journal').value = journal;
+      document.getElementById('j_vol').value = volume;
+      document.getElementById('j_issue').value = issue;
+      document.getElementById('j_page').value = page;
+      document.getElementById('j_doi').value = doi;
+
+      generateCitation();
+    }
+
+    // 加入多筆暫存清單並進行中英文雙軌排序
+    function addCurrentToList() {
+      const outBox = document.getElementById('singleRefOutput');
+      const htmlContent = outBox.innerHTML;
+      if (!htmlContent || htmlContent.includes('請於左側輸入')) {
+        showToast('請先完成當前文獻之生成！');
+        return;
+      }
+
+      const isZh = document.getElementById('docLang').value === 'zh';
+      const plainText = outBox.innerText.trim();
+
+      savedReferences.push({
+        id: Date.now() + Math.random(),
+        lang: isZh ? 'zh' : 'en',
+        rawText: plainText,
+        html: htmlContent
+      });
+
+      renderBatchList();
+      showToast('已加入文獻清單，並依中文筆劃/英文A-Z自動重排！');
+    }
+
+    // 依繁體中文筆劃 (stroke) 與英文 (A-Z) 進行雙軌排序並繪製
+    function renderBatchList() {
+      const zhList = savedReferences.filter(r => r.lang === 'zh');
+      const enList = savedReferences.filter(r => r.lang === 'en');
+
+      // 1. 中文筆劃少至多排序
+      zhList.sort((a, b) => a.rawText.localeCompare(b.rawText, 'zh-Hant-TW', { collation: 'stroke' }));
+
+      // 2. 英文 A 至 Z 排序
+      enList.sort((a, b) => a.rawText.localeCompare(b.rawText, 'en', { sensitivity: 'base' }));
+
+      // 中文在前、英文在後
+      const sorted = [...zhList, ...enList];
+
+      const ol = document.getElementById('batchOlList');
+      const tip = document.getElementById('emptyListTip');
+      const badge = document.getElementById('listCountBadge');
+      ol.innerHTML = '';
+
+      badge.innerText = `${sorted.length} 篇`;
+
+      if (sorted.length === 0) {
+        tip.classList.remove('hidden');
+        return;
+      }
+      tip.classList.add('hidden');
+
+      sorted.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'group flex items-start gap-2.5 pb-2 border-b border-slate-100 last:border-none';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'apa-hanging text-xs text-slate-800 flex-1 leading-relaxed';
+        contentDiv.innerHTML = item.html;
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'opacity-0 group-hover:opacity-100 transition p-1 text-slate-400 hover:text-rose-500 rounded';
+        delBtn.title = '移除此筆';
+        delBtn.innerHTML = '<i class="ph ph-x"></i>';
+        delBtn.onclick = () => {
+          savedReferences = savedReferences.filter(r => r.id !== item.id);
+          renderBatchList();
+        };
+
+        li.appendChild(contentDiv);
+        li.appendChild(delBtn);
+        ol.appendChild(li);
+      });
+    }
+
+    function clearBatchList() {
+      if (savedReferences.length === 0) return;
+      savedReferences = [];
+      renderBatchList();
+      showToast('已清空文獻庫');
+    }
+
+    // 複製富文本（保留 Word 斜體、超連結與標準凸排）
+    function copyRichText(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el || el.innerText.includes('請於左側輸入')) {
+        showToast('無可複製之內容！');
+        return;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      showToast('已複製富文本！貼入 Word 將保留斜體與連結格式');
+    }
+
+    // 複製純文字
+    function copyPlainText(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el || el.innerText.includes('請於左側輸入')) return;
+      const text = el.innerText.trim();
+      const tempArea = document.createElement('textarea');
+      tempArea.value = text;
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempArea);
+      showToast('已複製純文字！');
+    }
+
+    // 批次複製整份清單（富文本）
+    function copyBatchRichText() {
+      if (savedReferences.length === 0) {
+        showToast('暫存清單中尚無文獻！');
+        return;
+      }
